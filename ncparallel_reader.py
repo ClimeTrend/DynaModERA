@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import xarray as xr
 
+from mpi4py import MPI
+
+MPI_COMM = MPI.COMM_WORLD
+MPI_RANK = MPI_COMM.Get_rank()
+MPI_SIZE = MPI_COMM.Get_size()
+
 pyLOM.style_plots()
 
 def array_to_dataarray(
@@ -91,7 +97,7 @@ fname = 'data/era5_download/2019-01-01T00_2019-01-01T12_1h.nc'
 plotL = 0
 
 ## Read file
-file  = h5py.File(fname,'r')
+file  = h5py.File(fname,'r',driver='mpio',comm=MPI_COMM)
 time  = np.array(file['time'], dtype=np.float32)
 lev   = np.array(file['level'], dtype=np.float32)
 lat   = np.array(file['latitude'], dtype=np.float32)
@@ -103,18 +109,25 @@ npts   = nlev*nlat*nlon
 ntime  = len(time)
 points = np.array([nlev, nlat, nlon])
 
-start, end = pyLOM.utils.worksplit(0, npts, 0, nWorkers=1)
+start, end = pyLOM.utils.worksplit(0, npts, MPI_RANK, nWorkers=MPI_SIZE)
 start3D    = multi_dimension_mapping(start, points, start=True)
 end3D      = multi_dimension_mapping(end, points, start=False)
-var        = np.array(file[var][:,start3D[0]:end3D[0],start3D[1]:end3D[1],start3D[2]:end3D[2]], dtype=np.float32).reshape(ntime,npts).T
+mynptsG    = (end3D[0]-start3D[0])*nlat*nlon
+var        = np.array(file[var][:,start3D[0]:end3D[0],:,:], dtype=np.float32).reshape(ntime,mynptsG).T
 
+startslice = start3D[1]*nlon+start3D[2]
+endslice   = (end3D[1])*nlon+(nlon-end3D[2])
+var        = var[startslice:endslice,:]
+varG = pyLOM.utils.mpi_gather(var,0,all=True)
+varG = varG.reshape(nlat*nlon, ntime)
 if pyLOM.utils.is_rank_or_serial(0):
     fig, axs = plt.subplots(1, 1, figsize=(30, 10), subplot_kw={'projection': ccrs.PlateCarree()})
-    level2plot = array_to_dataarray(var, mesh[1].flatten(), mesh[0].flatten(), time, 0)
+    level2plot = array_to_dataarray(varG, mesh[1].flatten(), mesh[0].flatten(), time, 0)
     # First subplot
     level2plot.sel(time=time[0]).plot.contourf(ax=axs, transform=ccrs.PlateCarree(), cmap='jet', levels=range(230, 320, 1))
     axs.coastlines(color='black')
     axs.gridlines(draw_labels=True)
 
-    plt.savefig('validation_figure.png')
+    plt.savefig('validation_figure_%i.png' % MPI_SIZE)
 
+pyLOM.cr_info()
