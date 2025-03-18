@@ -86,9 +86,9 @@ def multi_dimension_mapping(ID:int, dims:np.ndarray, start=True):
         for idim in range(ndims-1):
             prod = np.prod(dims[idim+1:])
             div  = int(np.floor(ID/prod))
-            frac[idim] = div if div < dims[idim] and div != 0 else dims[idim]
+            frac[idim] = div #if div < dims[idim] and div != 0 else dims[idim]
             ID = ID%prod
-        frac[-1] = ID if ID < dims[-1] and ID != 0 else dims[-1]
+        frac[-1] = ID #if ID < dims[-1] and ID != 0 else dims[-1]
         return frac
 
 ## Inputs for the parser
@@ -112,12 +112,15 @@ points = np.array([nlev, nlat, nlon])
 start, end = pyLOM.utils.worksplit(0, npts, MPI_RANK, nWorkers=MPI_SIZE)
 start3D    = multi_dimension_mapping(start, points, start=True)
 end3D      = multi_dimension_mapping(end, points, start=False)
+pyLOM.pprint(-1, start3D, end3D, (end3D[0]-start3D[0])*nlat*nlon + (end3D[1]-start3D[1])*nlon + (end3D[2]-start3D[2]), flush=True)
 mynptsG    = (end3D[0]-start3D[0])*nlat*nlon
 var        = np.array(file[var][:,start3D[0]:end3D[0],:,:], dtype=np.float32).reshape(ntime,mynptsG).T
-
 startslice = start3D[1]*nlon+start3D[2]
 endslice   = (end3D[1])*nlon+(nlon-end3D[2])
 var        = var[startslice:endslice,:]
+
+## Gather all parts of the snapshot matrix for plotting
+pyLOM.pprint(-1, var.shape, flush=True)
 varG = pyLOM.utils.mpi_gather(var,0,all=True)
 varG = varG.reshape(nlat*nlon, ntime)
 if pyLOM.utils.is_rank_or_serial(0):
