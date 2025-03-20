@@ -92,9 +92,8 @@ def multi_dimension_mapping(ID:int, dims:np.ndarray, start=True):
         return frac
 
 ## Inputs for the parser
-var   = 'temperature'
-fname = 'data/era5_download/2020-01-01T00_2020-01-01T12_1h.nc'
-plotL = 12
+var   = 'temperature' #Inputs of the reading function
+fname = 'data/era5_download/2020-01-01T00_2020-01-01T12_1h.nc'  #Inputs of the reading function
 
 ## Read file
 file  = h5py.File(fname,'r',driver='mpio',comm=MPI_COMM)
@@ -120,16 +119,22 @@ endR       = start3D[0] + nlevelR
 var        = np.array(file[var][:,start3D[0]:endR,:,:], dtype=np.float32).reshape(ntime,mynptsR).T
 startslice = start3D[1]*nlon + start3D[2]
 endslice   = startslice + mynptsG
-var        = var[startslice:endslice,:]
+var        = var[startslice:endslice,:] # Matrix we will do the SVD on, output 1 of the function
 
-###### Here we would run the SVD and do any operation!
-
-## Generate an array to know which points are at each level for plotting
+## Generate an array to know which points are at each level for plotting (we need to know to which level belongs each point)
 levelMesh  = np.zeros((nlev,nlat,nlon), dtype=int)
 for ilevel in range(nlev):
     levelMesh[ilevel,:,:] = ilevel*np.ones((nlat,nlon), dtype=int)
 levelMesh  = levelMesh.reshape(nlev*nlat*nlon,)
-mylevels   = levelMesh[MPI_RANK*mynptsG:(MPI_RANK+1)*mynptsG]
+mylevels   = levelMesh[MPI_RANK*mynptsG:(MPI_RANK+1)*mynptsG] #Output 2 of the function (needed to select the level in which we'll plot)
+
+
+
+###### Here we would run the SVD and do any operation!
+
+
+
+plotL = 12 # Input for the plotting function
 maskPlot   = mylevels == plotL
 
 ## Gather all parts of the snapshot matrix for plotting
