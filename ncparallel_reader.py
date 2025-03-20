@@ -129,9 +129,8 @@ levelMesh  = levelMesh.reshape(nlev*nlat*nlon,)
 mylevels   = levelMesh[MPI_RANK*mynptsG:(MPI_RANK+1)*mynptsG] #Output 2 of the function (needed to select the level in which we'll plot)
 
 
-
 ###### Here we would run the SVD and do any operation!
-
+#U,S,V = pyLOM.POD.run(var)
 
 
 plotL = 12 # Input for the plotting function
